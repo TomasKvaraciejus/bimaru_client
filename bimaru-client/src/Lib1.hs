@@ -76,7 +76,7 @@ findSubstring key a =
 -- renders your game board
 render :: State -> String
 -- render = show
-render (State _ b c d) = firstSpaces b c d
+render (State _ b c d) = firstSpaces c b d
     where
         --             Rows     Cols     Toggled
         firstSpaces :: [Int] -> [Int] -> [Coord] -> String
@@ -92,7 +92,7 @@ render (State _ b c d) = firstSpaces b c d
                         otherRows [] 10 z e = e
                         otherRows (x:xs) y z e = e ++ otherRows xs (y+1) z (show x ++ " " ++ fillUpWithData 9 y z ++ " \n")
                             where
-                                --              Row nr. Col nr.  Toggled
+                                --              rows left Col nr.  Toggled
                                 fillUpWithData :: Int -> Int -> [Coord] -> String
                                 fillUpWithData (-1) _ _= []
                                 fillUpWithData a b c =
@@ -118,12 +118,25 @@ toggle (State a b c d) x =
     else saveInput (State a b c d) x
         where
             saveInput :: State -> [String] -> State
-            saveInput (State a b c d) x = State a b c (addToggledX x ++ d)  
+            saveInput (State a b c d) x = State a b c (createCoord x d)
                 where
-                    addToggledX :: [String] -> [Coord]
-                    addToggledX [] = []
-                    addToggledX (x:y:xs) = Coord (read x) (read y) : addToggledX xs 
-                    addToggledX _ = error "addToggledX"
+                    createCoord :: [String] -> [Coord] -> [Coord]
+                    createCoord [] x = x
+                    createCoord (x:y:xs) d =  checkToggled xs (Coord (read x)(read y)) d
+                        where 
+                            checkToggled :: [String] -> Coord -> [Coord] -> [Coord]
+                            checkToggled s a b =
+                                if elem a b
+                                then createCoord s (removeOne b a)
+                                else createCoord s (a : b)
+                                    where
+                                        removeOne :: [Coord] -> Coord -> [Coord]
+                                        removeOne = \list v -> 
+                                            case list of 
+                                            [] -> error "Element not found!"
+                                            x:xs | v==x -> xs
+                                            x:xs -> x:removeOne xs v
+                    createCoord _ _ = error "createCoord"
 
 -- IMPLEMENT
 -- Adds hint data to the game state
