@@ -4,5 +4,5 @@ packages:
 resolver: lts-18.28
 compiler: ghc-8.10.7
 compiler-check: match-exact
-system-ghc: true
+system-ghc: false
 install-ghc: false

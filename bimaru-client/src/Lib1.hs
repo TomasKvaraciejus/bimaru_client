@@ -1,16 +1,9 @@
--- Before reviewing our code, please watch this youtube video:
--- https://www.youtube.com/watch?v=svUtlHC2ph4
--- Don't worry. Not a virus. Totally.
-
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 module Lib1(
-    State, emptyState, gameStart, render, mkCheck, toggle, hint
+    State(..), emptyState, gameStart, render, mkCheck, toggle, hint
 ) where
 
 import Types
-import Data.Data (typeOf, ConstrRep (IntConstr))
-import Data.Aeson (Value(String))
-import Data.Yaml (ParseException(MultipleDocuments), YamlMark (yamlColumn))
 
 -- This is a state of your game.
 -- It must contain all values you might need during a game:
@@ -23,7 +16,8 @@ data State = State{
     cols :: [Int],
     toggled :: [Coord]
     -- id :: String
-} deriving Show
+} deriving (Eq, Show)
+
 
 -- IMPLEMENT
 -- This is very initial state of your program
@@ -33,32 +27,34 @@ emptyState = State 0 [] [] []
 -- IMPLEMENT
 -- This adds game data to initial state 
 gameStart :: State -> Document -> State
-gameStart (State a b c d) f = State x y z d
+gameStart (State _ _ _ d) f = State x y z d
     where
-        x = toNum(findSubstring "number_of_hints" (toMap f))
+        x = toNum'(findSubstring "number_of_hints" (toMap f))
         y = makeList(findSubstring "occupied_rows" (toMap f))
         z = makeList(findSubstring "occupied_cols" (toMap f))
 
 
 toMap :: Document -> [(String, Document)]
 toMap (DMap a) = a
+toMap _ = []
 
-toNum :: Document -> Int
-toNum (DInteger a) = a
+toNum' :: Document -> Int
+toNum' (DInteger a) = a
+toNum' _ = -1
 
-toList :: Document -> [Document]
-toList (DList a) = a
-
+toList' :: Document -> [Document]
+toList' (DList a) = a
+toList' _ = []
 
 makeList :: Document -> [Int]
-makeList (DMap (x:xs)) = toNum (snd x) : getTail xs
+makeList (DMap (x:xs)) = toNum' (snd x) : getTail xs
     where
         getTail :: [(String, Document)] -> [Int]
-        getTail (a:as) = getInteger (snd a)
+        getTail (a:_) = getInteger (snd a)
             where
                 getInteger :: Document -> [Int]
                 getInteger DNull = []
-                getInteger (DMap (x:xs)) = toNum (snd x) : getTail xs
+                getInteger (DMap (z:zs)) = toNum' (snd z) : getTail zs
                 getInteger _ = error "Error when making list"
         getTail _ = error "Error when getting tail"
 makeList _ = error "Here"
@@ -80,7 +76,7 @@ render (State _ b c d) = firstSpaces c b d
     where
         --             Rows     Cols     Toggled
         firstSpaces :: [Int] -> [Int] -> [Coord] -> String
-        firstSpaces b c d = "RUSKI VOIENY KARABL - IDI NX\n   " ++ headerRow b c d
+        firstSpaces b' c' d' = "RUSKI VOIENY KARABL - IDI NX\n   " ++ headerRow b' c' d'
             where
                 --          Rows     Cols     Toggled
                 headerRow :: [Int] -> [Int] -> [Coord] -> String
@@ -89,16 +85,16 @@ render (State _ b c d) = firstSpaces c b d
                     where
                         --           Cols    Row nr. Toggled   Visi likę rows
                         otherRows :: [Int] -> Int -> [Coord] -> String -> String
-                        otherRows [] 10 z e = e
-                        otherRows (x:xs) y z e = e ++ otherRows xs (y+1) z (show x ++ " " ++ fillUpWithData 9 y z ++ " \n")
+                        otherRows [] 10 _ e = e
+                        otherRows (x:xs) y' z' e = e ++ otherRows xs (y'+1) z (show x ++ " " ++ fillUpWithData 9 y' z' ++ " \n")
                             where
                                 --              rows left Col nr.  Toggled
                                 fillUpWithData :: Int -> Int -> [Coord] -> String
                                 fillUpWithData (-1) _ _= []
-                                fillUpWithData a b c =
-                                    if elem (Coord a b) c
-                                    then fillUpWithData (a-1) b c ++ " #"
-                                    else fillUpWithData (a-1) b c ++ " _"
+                                fillUpWithData a b'' c'' =
+                                    if elem (Coord a b'') c''
+                                    then fillUpWithData (a-1) b'' c'' ++ " #"
+                                    else fillUpWithData (a-1) b'' c'' ++ " _"
                         otherRows _ _ _ _= error "otherRows"
 
 
@@ -118,24 +114,24 @@ toggle (State a b c d) x =
     else saveInput (State a b c d) x
         where
             saveInput :: State -> [String] -> State
-            saveInput (State a b c d) x = State a b c (createCoord x d)
+            saveInput (State a' b' c' d') x' = State a' b' c' (createCoord x' d')
                 where
                     createCoord :: [String] -> [Coord] -> [Coord]
-                    createCoord [] x = x
-                    createCoord (x:y:xs) d =  checkToggled xs (Coord (read x)(read y)) d
+                    createCoord [] x'' = x''
+                    createCoord (x'':y:xs) d'' =  checkToggled xs (Coord (read x'')(read y)) d''
                         where 
                             checkToggled :: [String] -> Coord -> [Coord] -> [Coord]
-                            checkToggled s a b =
-                                if elem a b
-                                then createCoord s (removeOne b a)
-                                else createCoord s (a : b)
+                            checkToggled s q w =
+                                if elem q w
+                                then createCoord s (removeOne w q)
+                                else createCoord s (q : w)
                                     where
                                         removeOne :: [Coord] -> Coord -> [Coord]
                                         removeOne = \list v -> 
                                             case list of 
                                             [] -> error "Element not found!"
-                                            x:xs | v==x -> xs
-                                            x:xs -> x:removeOne xs v
+                                            e:es | v==e -> es
+                                            e:es -> e : removeOne es v
                     createCoord _ _ = error "createCoord"
 
 -- IMPLEMENT
@@ -143,17 +139,17 @@ toggle (State a b c d) x =
 hint :: State -> Document -> State
 hint (State a b c d) t = State a b c x
     where
-        x = (fillUpHints $ toMap t) ++ d
+        x = fillUpHints (toMap t) ++ d
 
 
 fillUpHints :: [(String, Document)] -> [Coord]
-fillUpHints (x:_) = getElements (toList $ snd x)
+fillUpHints (x:_) = getElements (toList' $ snd x)
     where
         getElements :: [Document] -> [Coord]
         getElements [] = []
-        getElements (x:xs) = go (toMap x) : getElements xs
+        getElements (y:ys) = go (toMap y) : getElements ys
             where
                 go :: [(String, Document)] -> Coord
-                go (x:y:[]) = Coord (toNum $ snd x) (toNum $ snd y)
+                go (x':y':[]) = Coord (toNum' $ snd x') (toNum' $ snd y')
                 go _ = error "go"
 fillUpHints _ = error "Filling up"
