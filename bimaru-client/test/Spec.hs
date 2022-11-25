@@ -50,39 +50,41 @@ fromYamlTests = testGroup "Document from yaml"
 toYamlTests :: TestTree
 toYamlTests = testGroup "Document to yaml"
   [   testCase "null" $
-        renderDocument DNull @?= "null"
+        renderDocument DNull @?= "~"
     , testCase "int" $
         renderDocument (DInteger 5) @?= "5"
     , testCase "list of ints" $
         renderDocument (DList [DInteger 5, DInteger 6]) @?= listOfInts
     , testCase "Big boi" $
         renderDocument (DMap[("game_setup_id", DString "0de28b51-e8ef-41d5-a1e6-131b51c4a638"), ("number_of_hints", DInteger 10), ("occupied_rows", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 5), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 4), ("tail", DMap[("head", DInteger 2), ("tail", DNull)])])])])])])])])])]), ("occupied_cols", DMap[("head", DInteger 1), ("tail", DMap[("head", DInteger 1), ("tail", DMap[("head", DInteger 4), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 4), ("tail", DNull)])])])])])])])])])])]) @?=
-          "game_setup_id: 0de28b51-e8ef-41d5-a1e6-131b51c4a638\nnumber_of_hints: 10\noccupied_rows:\n  head: 3\n  tail:\n    head: 3\n    tail:\n      head: 0\n      tail:\n        head: 0\n        tail:\n          head: 3\n          tail:\n            head: 0\n            tail:\n              head: 5\n              tail:\n                head: 0\n                tail:\n                  head: 4\n                  tail:\n                    head: 2\n                    tail: null\noccupied_cols:\n  head: 1\n  tail:\n    head: 1\n    tail:\n      head: 4\n      tail:\n        head: 2\n        tail:\n          head: 2\n          tail:\n            head: 2\n            tail:\n              head: 2\n              tail:\n                head: 2\n                tail:\n                  head: 0\n                  tail:\n                    head: 4\n                    tail: null\n"
+          "game_setup_id: 0de28b51-e8ef-41d5-a1e6-131b51c4a638\nnumber_of_hints: 10\noccupied_rows:\n  head: 3\n  tail:\n    head: 3\n    tail:\n      head: 0\n      tail:\n        head: 0\n        tail:\n          head: 3\n          tail:\n            head: 0\n            tail:\n              head: 5\n              tail:\n                head: 0\n                tail:\n                  head: 4\n                  tail:\n                    head: 2\n                    tail: ~\noccupied_cols:\n  head: 1\n  tail:\n    head: 1\n    tail:\n      head: 4\n      tail:\n        head: 2\n        tail:\n          head: 2\n          tail:\n            head: 2\n            tail:\n              head: 2\n              tail:\n                head: 2\n                tail:\n                  head: 0\n                  tail:\n                    head: 4\n                    tail: ~\n"
     , testCase "Dlist" $
         renderDocument (DMap[("John", DList[DString "Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5)], DString "t", DString "q"], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")]) @?=
-          "John:\n  - Hello\n    - 1\n    - 2\n    - kello: null\n      priviet: 5\n    - t\n    - q\n  - Hu: null\n    John: 1\n    hi: hello\ngame: o\n"
+          "John:\n  - Hello\n    - 1\n    - 2\n    - kello: ~\n      priviet: 5\n    - t\n    - q\n  - Hu: ~\n    John: 1\n    hi: hello\ngame: o\n"
     , testCase "DList in DList" $
         renderDocument (DMap[("John", DMap[("Hello", DList[ DString "Nice", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5), ("not", DString "t"), ("map", DMap[("Hu", DMap[("John", DInteger 1), ("yes", DNull)])])], DInteger 5]]), ("game", DString "o")])]) @?=
-          "John:\n  Hello:\n    - Nice\n      - 1\n      - 2\n      - kello: null\n        priviet: 5\n        not: t\n        map:\n          Hu:\n            John: 1\n            yes: null\n      - 5\n  game: o\n"
+          "John:\n  Hello:\n    - Nice\n      - 1\n      - 2\n      - kello: ~\n        priviet: 5\n        not: t\n        map:\n          Hu:\n            John: 1\n            yes: ~\n      - 5\n  game: o\n"
     , testCase "DList in DMap" $
         renderDocument (DList[DInteger 4, DInteger 9, DMap[("u", DMap[("red", DList[DMap[("Hello", DInteger 9)], DMap[("green", DInteger 6), ("brown", DList[DMap[("not", DInteger 5)], DMap[("notnice", DInteger 6)]]), ("nice", DString "nice")]])])], DNull]) @?=
-          "- 4\n- 9\n- u:\n    red:\n      - Hello: 9\n      - green: 6\n        brown:\n          - not: 5\n          - notnice: 6\n        nice: nice\n- null\n"
+          "- 4\n- 9\n- u:\n    red:\n      - Hello: 9\n      - green: 6\n        brown:\n          - not: 5\n          - notnice: 6\n        nice: nice\n- ~\n"
     , testCase "DInteger" $
         renderDocument (DInteger 5) @?= "5"   
     , testCase "DNull" $
         renderDocument DNull @?= "~"
     , testCase "DString" $
-        renderDocument (DString "hello") @?= "'hello'"
+        renderDocument (DString "hello") @?= "hello"
     , testCase "DMap" $
-        renderDocument (DMap[("Hello", DInteger 3)]) @?= "[{'Hello': 3}]"
+        renderDocument (DMap[("Hello", DInteger 3)]) @?= "- Hello: 3\n"
+    , testCase "DMap 2" $
+        renderDocument (DMap[("Hello", DInteger 3), ("Hello 2", DInteger 4)]) @?= "- Hello: 3\n- Hello 2: 4\n"
     , testCase "DMap nested DMap" $
-        renderDocument (DMap[("Hello", DMap[("Bye", DString "red bird")])]) @?= "[{'Hello': [{'Bye': 'red bird'}]}]"
+        renderDocument (DMap[("Hello", DMap[("Bye", DString "red bird")])]) @?= "[{Hello: [{Bye: red bird}]}]"
     , testCase "DMap nested DList" $
-        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "[{'Hello': [4, 'good', [{'Wow': ~}]]}]"
+        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "[{Hello: [4, good, [{Wow: ~}]]}]"
     , testCase "DList" $
-        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "[1, ~, 'hello']"
+        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "[1, ~, hello]"
     , testCase "DList nested DList" $
-        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "[~, 'red', [4, 0, [{'Hello': 'goodbye'}]]]"
+        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "[~, red, [4, 0, [{Hello: goodbye}]]]"
     , testCase "Coord List" $
         renderDocument (DMap[("coords", DList [DMap[("col: ", DInteger 1), ("row: ", DInteger 1)]])]) @?= "{coords: [{col: 1, row: 1}]}"
   ]
