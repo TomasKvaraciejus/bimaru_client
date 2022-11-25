@@ -66,20 +66,22 @@ parseCoordList [] = ""
 parseCoordList ((DMap [x, y]):xs) = "- " ++ fst x ++ show (toNum' $ snd x) ++ "\n  " ++ fst y ++ show (toNum' $ snd y) ++ "\n" ++ parseCoordList xs
 parseCoordList _ = ""
 
-
 parseDList :: Int -> Int -> [Document] -> String
 parseDList _ _ [] = ""
 parseDList i minus ((DList x):xs) = replicate (i * 2) ' ' ++ parseDList (i + 1) i x ++ parseDList i 0 xs
 parseDList i minus ((DMap x):xs) = replicate (i * 2) ' ' ++ "- " ++ parseDMap (i + 1) 0 x ++ parseDList i 0 xs
-parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ "\n" ++ parseDList i 0 xs 
-parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ x ++ "\n" ++ parseDList i 0 xs
-parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "~"  ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs 
+parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "~"  ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
 
+checkIfDList :: [Document] -> String
+checkIfDList ((DList x):_) = ":"
+checkIfDList _ = ""
 
 parseDMap :: Int -> Int ->[(String, Document)] -> String
 parseDMap _ _ [] = ""
 parseDMap i mult ((x, DMap y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ":\n" ++ parseDMap (i + 1) 1 y ++ parseDMap i 1 xs
-parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ x ++ ":\n" ++ parseDList (i + 1) 0 y ++ parseDMap i 1 xs
+parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ x ++ ":\n" ++ parseDList (i + 1) 0 y  ++ parseDMap i 1 xs
 parseDMap i mult ((x, DInteger y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": " ++ show y ++ "\n" ++ parseDMap i 1 xs
 parseDMap i mult ((x, DString y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": " ++ y ++ "\n" ++ parseDMap i 1 xs
 parseDMap i mult ((x, DNull):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": ~" ++ "\n" ++ parseDMap i 1 xs

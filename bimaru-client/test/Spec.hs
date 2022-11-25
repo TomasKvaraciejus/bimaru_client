@@ -60,10 +60,10 @@ toYamlTests = testGroup "Document to yaml"
           "game_setup_id: 0de28b51-e8ef-41d5-a1e6-131b51c4a638\nnumber_of_hints: 10\noccupied_rows:\n  head: 3\n  tail:\n    head: 3\n    tail:\n      head: 0\n      tail:\n        head: 0\n        tail:\n          head: 3\n          tail:\n            head: 0\n            tail:\n              head: 5\n              tail:\n                head: 0\n                tail:\n                  head: 4\n                  tail:\n                    head: 2\n                    tail: ~\noccupied_cols:\n  head: 1\n  tail:\n    head: 1\n    tail:\n      head: 4\n      tail:\n        head: 2\n        tail:\n          head: 2\n          tail:\n            head: 2\n            tail:\n              head: 2\n              tail:\n                head: 2\n                tail:\n                  head: 0\n                  tail:\n                    head: 4\n                    tail: ~\n"
     , testCase "Dlist" $
         renderDocument (DMap[("John", DList[DString "Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5)], DString "t", DString "q"], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")]) @?=
-          "John:\n  - Hello\n    - 1\n    - 2\n    - kello: ~\n      priviet: 5\n    - t\n    - q\n  - Hu: ~\n    John: 1\n    hi: hello\ngame: o\n"
+          "John:\n  - Hello:\n    - 1\n    - 2\n    - kello: ~\n      priviet: 5\n    - t\n    - q\n  - Hu: ~\n    John: 1\n    hi: hello\ngame: o\n"
     , testCase "DList in DList" $
         renderDocument (DMap[("John", DMap[("Hello", DList[ DString "Nice", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5), ("not", DString "t"), ("map", DMap[("Hu", DMap[("John", DInteger 1), ("yes", DNull)])])], DInteger 5]]), ("game", DString "o")])]) @?=
-          "John:\n  Hello:\n    - Nice\n      - 1\n      - 2\n      - kello: ~\n        priviet: 5\n        not: t\n        map:\n          Hu:\n            John: 1\n            yes: ~\n      - 5\n  game: o\n"
+          "John:\n  Hello:\n    - Nice:\n      - 1\n      - 2\n      - kello: ~\n        priviet: 5\n        not: t\n        map:\n          Hu:\n            John: 1\n            yes: ~\n      - 5\n  game: o\n"
     , testCase "DList in DMap" $
         renderDocument (DList[DInteger 4, DInteger 9, DMap[("u", DMap[("red", DList[DMap[("Hello", DInteger 9)], DMap[("green", DInteger 6), ("brown", DList[DMap[("not", DInteger 5)], DMap[("notnice", DInteger 6)]]), ("nice", DString "nice")]])])], DNull]) @?=
           "- 4\n- 9\n- u:\n    red:\n      - Hello: 9\n      - green: 6\n        brown:\n          - not: 5\n          - notnice: 6\n        nice: nice\n- ~\n"
@@ -74,19 +74,23 @@ toYamlTests = testGroup "Document to yaml"
     , testCase "DString" $
         renderDocument (DString "hello") @?= "hello"
     , testCase "DMap" $
-        renderDocument (DMap[("Hello", DInteger 3)]) @?= "- Hello: 3\n"
+        renderDocument (DMap[("Hello", DInteger 3)]) @?= "Hello: 3\n"
     , testCase "DMap 2" $
-        renderDocument (DMap[("Hello", DInteger 3), ("Hello 2", DInteger 4)]) @?= "- Hello: 3\n- Hello 2: 4\n"
+        renderDocument (DMap[("Hello", DInteger 3), ("Hello", DInteger 4)]) @?= "Hello: 3\nHello: 4\n"
     , testCase "DMap nested DMap" $
-        renderDocument (DMap[("Hello", DMap[("Bye", DString "red bird")])]) @?= "[{Hello: [{Bye: red bird}]}]"
+        renderDocument (DMap[("Hello", DMap[("Bye", DString "red bird")])]) @?= "Hello:\n  Bye: red bird\n"
     , testCase "DMap nested DList" $
-        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "[{Hello: [4, good, [{Wow: ~}]]}]"
+        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "Hello:\n  - 4\n  - good\n  - Wow: ~\n"
     , testCase "DList" $
-        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "[1, ~, hello]"
+        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "- 1\n- ~\n- hello\n"
     , testCase "DList nested DList" $
-        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "[~, red, [4, 0, [{Hello: goodbye}]]]"
+        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "- ~\n- red:\n  - 4\n  - 0\n  - Hello: goodbye\n"
+    , testCase "DList nested DList 2" $
+        renderDocument (DList[DList[DList[DList[DString "a"]]]]) @?= "        - a\n"
+    , testCase "DList nested DList 3" $
+        renderDocument (DList[DString "aa", DList[DList[DString "aaa", DList[DString "a"]]]]) @?= "- aa:\n    - aaa:\n      - a\n"
     , testCase "Coord List" $
-        renderDocument (DMap[("coords", DList [DMap[("col: ", DInteger 1), ("row: ", DInteger 1)]])]) @?= "{coords: [{col: 1, row: 1}]}"
+        renderDocument (DMap[("coords", DList [DMap[("col: ", DInteger 1), ("row: ", DInteger 1)]])]) @?= "coords:\n- col: 1\n  row: 1\n"
   ]
 
 wrongState :: String
@@ -190,7 +194,7 @@ hintTests = testGroup "Test hint document"
         hint emptyState (DMap [("coords", DList[DMap[("col", DInteger 5), ("harry", DInteger 4)]])]) @?= Left "Bad value in one on Hint's DMap values"
     , testCase "Wrong 2nd tuple's value" $
         hint emptyState (DMap [("coords", DList[DMap[("col", DInteger 5), ("row", DNull)]])]) @?= Left "Tuple most contain a string key and a DInteger value"
-      , testCase "Too many tuples" $
+    , testCase "Too many tuples" $
         hint emptyState (DMap [("coords", DList[DMap[("col", DInteger 5), ("row", DInteger 1), ("head", DInteger 2)]])]) @?= Left "Too many values in one of Hint's DMaps"
     , testCase "Wrong type after first DMap" $
         hint emptyState (DMap [("coords", DList[DMap[("col", DInteger 5), ("row", DInteger 1)],DNull])]) @?= Left "DList must contain only DMaps with 2 tuples each"
