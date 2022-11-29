@@ -18,13 +18,13 @@ instance FromDocument Hint where
 parseDocument :: String -> Either String Document
 parseDocument str = createDocument str
 
-createType :: String -> Either String Document
+createType :: String -> Either String Document -- creates base type (DString, DInteger, DNull)
 createType str
     | readLine str == "null" || readLine str == "~" = Right DNull
     | isInteger (removeAllSpacing (readLine str)) False = Right $ DInteger $ read $ readLine str
     | otherwise = Right $ DString $ readLine str
 
-createDocument :: String -> Either String Document
+createDocument :: String -> Either String Document 
 createDocument str
     | elem '-' (readLine str) = do
         DList <$> (createDList str (spacingLength str))
@@ -33,14 +33,14 @@ createDocument str
         return $ DMap a
     | otherwise = createType str
 
-createDMap :: String -> Int -> Either String [(String, Document)]
+createDMap :: String -> Int -> Either String [(String, Document)] -- recursively creates DMap
 createDMap [] n = Right []
 createDMap str n =
     do
-        a <- parseDMap str
-        b <- if str == [] then Right [] else if take 1 (readLine (getNextLine str)) /= "\n"
-                                        then createDMap ((dropUntilSameSpacing (dropUntil str '\n') n) True) n
-                                        else createDMap (dropUntilSameSpacing (dropUntil (dropUntil str '\n') '\n') n True) n
+        a <- parseDMap str -- a = (key, value)
+        b <- if str == [] then Right [] else if take 1 (drop (getLengthUntil str ':' + 1) str) /= "\n" -- b = recursively created DMap to append take 1 (drop (getLengthUntil str ':' + 1) str)
+                                        then createDMap ((dropUntilSameSpacing (dropUntil str '\n') n) True) n -- recursively call next line
+                                        else createDMap (dropUntilSameSpacing (dropUntil (dropUntil str '\n') '\n') n True) n -- recursively call next next line
         return $ a : b
 
 createDList :: String -> Int -> Either String [Document]
@@ -64,11 +64,6 @@ isDNull _ = False
 
 isValueOnSameLine :: String -> Bool
 isValueOnSameLine str = take 1 (drop (getLengthUntil str ':' + 1) str) /= "\n"
-
-combineElements :: Document -> Document -> Document
-combineElements (DMap a) (DMap b) = DMap $ a ++ b
-combineElements a (DList b) = DList $ [a] ++ b
-combineElements a b = DList $ [a] ++ [b]
 
 parseDMap :: String -> Either String (String, Document)
 parseDMap str = do
