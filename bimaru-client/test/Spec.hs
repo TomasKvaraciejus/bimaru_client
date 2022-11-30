@@ -40,29 +40,29 @@ fromYamlTests = testGroup "Document from yaml"
           parseDocument "~" @?= Right DNull
     , testCase "DList" $
         parseDocument "John:\n  - Hello:\n    - 1\n    - 2\n    - kello: null\n      priviet: 5\n    - t\n    - q\n  - Hu: null\n    John: 1\n    hi: hello\ngame: o\n" @?=
-          Right (DMap[("John", DList[DMap[("Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 4)], DString "t", DString "q"])], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")])
+          Right (DMap[("John", DList[DMap[("Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5)], DString "t", DString "q"])], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")])
     , testCase "DMap - 1 element" $
         parseDocument "John: 5\n" @?= Right (DMap[("John", DInteger 5)])
     , testCase "DMap - 2 elements" $
         parseDocument "John: 5\nStacey: Konichiwa\n" @?= Right (DMap[("John", DInteger 5), ("Stacey", DString "Konichiwa")])
     , testCase "DMap - 3 elements" $
-        parseDocument "John: 5\nStacey: Konichiwa\nJessica: ~\n" @?= Right (DMap[("John", DInteger 5), ("Stacey", DString "Konichiwa"), ("Jessica", DNull)])
+        parseDocument "John: 5\nStacey: Konichiwa\nJessica: null\n" @?= Right (DMap[("John", DInteger 5), ("Stacey", DString "Konichiwa"), ("Jessica", DNull)])
     , testCase "DMap - 2 elements, nested" $
         parseDocument "John:\n  Stacey: 5\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5)])])
     , testCase "DMap - 3 elements, nested inside" $
-        parseDocument "John:\n  Stacey: 5\n  Jessica: ~\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5), ("Jessica", DNull)])])
+        parseDocument "John:\n  Stacey: 5\n  Jessica: null\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5), ("Jessica", DNull)])])
     , testCase "DMap - 3 elements, nested outside" $
-        parseDocument "John:\n  Stacey: 5\nJessica: ~\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5)]), ("Jessica", DNull)])
+        parseDocument "John:\n  Stacey: 5\nJessica: null\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5)]), ("Jessica", DNull)])
     , testCase "Dmap - many nested" $
         parseDocument "John:\n  Stacey:\n    Jessica:\n      Kelly: 5" @?= Right (DMap[("John", DMap[("Stacey", DMap[("Jessica", DMap[("Kelly", DInteger 5)])])])])
     , testCase "Dlist - 1 element" $ 
         parseDocument "- John\n" @?= Right (DList[DString "John"])
-    , testCase "Dlist - 2 elements" $ 
+    , testCase "Dlist - 2 elements " $ 
         parseDocument "- John\n- 2\n" @?= Right (DList[DString "John", DInteger 2])
     , testCase "Dlist - 3 elements" $ 
         parseDocument "- John\n- Kelly\n- Jeremy\n" @?= Right (DList[DString "John", DString "Kelly", DString "Jeremy"])
     , testCase "DList - 2 lists nested" $
-        parseDocument "- John:\n  - Jeremy\n" @?= Right (DList[DString "John", DList[DString "Jeremy"]])
+        parseDocument "- John:\n  - Jeremy\n" @?= Right (DList[DMap[("John", DList[DString "Jeremy"])]])
     , testCase "DList & DMap - 2 elements nested" $
         parseDocument "John:\n  - Jeremy: 5\n" @?= Right (DMap[("John", DList[DMap[("Jeremy", DInteger 5)]])])
     , testCase "DMap & DList - 2 elements, nested" $
