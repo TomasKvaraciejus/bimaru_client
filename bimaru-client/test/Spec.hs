@@ -57,7 +57,7 @@ fromYamlTests = testGroup "Document from yaml"
         parseDocument "John:\n  Stacey:\n    Jessica:\n      Kelly: 5" @?= Right (DMap[("John", DMap[("Stacey", DMap[("Jessica", DMap[("Kelly", DInteger 5)])])])])
     , testCase "Dlist - 1 element" $ 
         parseDocument "- John\n" @?= Right (DList[DString "John"])
-    , testCase "Dlist - 2 elements" $ 
+    , testCase "Dlist - 2 elements " $ 
         parseDocument "- John\n- 2\n" @?= Right (DList[DString "John", DInteger 2])
     , testCase "Dlist - 3 elements" $ 
         parseDocument "- John\n- Kelly\n- Jeremy\n" @?= Right (DList[DString "John", DString "Kelly", DString "Jeremy"])
