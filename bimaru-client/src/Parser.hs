@@ -66,7 +66,7 @@ createDList :: String -> Int -> Either String [Document]
 createDList [] n = Right []
 createDList str n =
     do
-        a <- createDListElement $ replaceDash str (n + 1)
+        a <- createDListElement $ replaceDash str
         b <- if str == [] then Right [] else
             do
                 a <- dropUntilSameSpacing (dropUntil str '\n') n False
@@ -76,7 +76,7 @@ createDList str n =
 createDListElement :: String -> Either String Document
 createDListElement str
     | elem ':' (readLine str) = do
-        a <- createDMap str (spacingLength str + 1)
+        a <- createDMap str $ spacingLength (replaceDash str)
         return $ DMap a
     | otherwise = createType $ removeBackSpacing $ readLine str
 
@@ -105,14 +105,14 @@ dropUntil s c = drop (getLengthUntil s c + 1) s
 dropUntilSameSpacing :: String -> Int -> Bool -> Either String String
 dropUntilSameSpacing [] _ _ = Right []
 dropUntilSameSpacing str n dmap
-    | dmap = if spacingLength str == n then 
+    | dmap = if (spacingLength (str)) == n then 
                 if elem ':' (readLine str) then Right str
                 else Left $ "incorrect height formatting. " ++ errorMsg str
              else dropUntilSameSpacing (dropUntil str '\n') n dmap
 
-    | otherwise = if spacingLength str == n then Right str 
+    | otherwise = if (spacingLength (str)) == n then Right str 
                   else 
-                      if spacingLength str < n then Right [] 
+                      if (spacingLength (str)) < n then Right [] 
                       else dropUntilSameSpacing (dropUntil str '\n') n dmap
 
 readLine :: String -> String
@@ -137,8 +137,10 @@ isInteger (s:xs) b
 isEmptyLine :: String -> Bool
 isEmptyLine str = length (dropWhile (\x -> x == ' ') str) == 0
 
-replaceDash :: String -> Int -> String
-replaceDash str n = createSpacing n ++ (drop n str)
+replaceDash :: String -> String
+replaceDash str
+    | elem '-' (readLine str) = createSpacing (getLengthUntil str '-' + 1) ++ (drop (getLengthUntil str '-' + 1) str)
+    | otherwise = str
 
 createSpacing :: Int -> String
 createSpacing 0 = []
