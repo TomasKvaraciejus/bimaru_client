@@ -3,7 +3,7 @@
 {-# HLINT ignore "Avoid lambda" #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
 
-module Parser () where
+module Parser13 () where
 
 data Document =
     DMap [(String, Document)]

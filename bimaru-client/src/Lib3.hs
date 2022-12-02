@@ -13,72 +13,105 @@ instance FromDocument Hint where
     fromDocument (DString x) = Right Hint
     fromDocument _ = Left "not a DString"
 
--- IMPLEMENT
--- Parses a document from yaml
 parseDocument :: String -> Either String Document
-parseDocument str = createDocument str
+parseDocument str = if take 1 (reverse str) == "\n" 
+                    then if checkDocument str (spacingLength str) 
+                         then createDocument str 
+                         else Left $ "incorrect document format"
+                    else Left $ "missing endl at end"
 
 createType :: String -> Either String Document -- creates base type (DString, DInteger, DNull)
 createType str
-    | readLine str == "null" || readLine str == "~" = Right DNull
-    | isInteger (removeAllSpacing (readLine str)) False = Right $ DInteger $ read $ readLine str
-    | otherwise = Right $ DString $ readLine str
+    | elem '\'' (readLine str) || elem '\"' (readLine str) = Right $ DString $ getQuotedValue str 
+    | removeForwardSpacing (removeBackSpacing $ readLine str) == "null" || removeForwardSpacing (removeBackSpacing $ readLine str) == "~" = Right DNull
+    | isInteger (removeForwardSpacing (removeBackSpacing (readLine str))) False = parseDInteger $ readLine str
+    | otherwise = Right $ DString $ removeForwardSpacing $ removeBackSpacingDMap (readLine str)
 
-createDocument :: String -> Either String Document 
+checkDocument :: String -> Int -> Bool
+checkDocument [] _ = True
+checkDocument str n
+    | spacingLength str < n = False
+    | otherwise = checkDocument (dropUntil str '\n') n
+
+checkType :: String -> Bool
+checkType str = if (getNextLine str) == [] then True 
+                else if ((elem ':' (getNextLine str)) || (elem '-' (getNextLine str))) then True
+                else False
+
+parseDInteger :: String -> Either String Document
+parseDInteger str
+    | elem '-' str =
+        if not (isInteger (dropUntil str '-') False) then Left $ "incorrect integer format. " ++ errorMsg str
+        else Right $ DInteger $ read (drop (getLengthUntil str '-') str)
+    | otherwise = Right $ DInteger $ read str
+
+createDocument :: String -> Either String Document
 createDocument str
-    | elem '-' (readLine str) = do
-        DList <$> (createDList str (spacingLength str))
+    | removeBackSpacingDMap (readLine str) == "[]" = Right $ DList []
+    | removeBackSpacingDMap (readLine str) == "{}" = Right $ DMap []
+    | elem '-' (readLine str) && (take 1 (dropUntil str '-') == " ") = do
+        DList <$> ((createDList str (spacingLength str)))
     | elem ':' (readLine str) = do
-        a <- createDMap str (spacingLengthDMap str)
+        a <- createDMap str (spacingLength str)
         return $ DMap a
-    | otherwise = createType str
+    | otherwise =   if checkType str 
+                    then createType $ str
+                    else Left "AAA"
 
 createDMap :: String -> Int -> Either String [(String, Document)] -- recursively creates DMap
 createDMap [] n = Right []
 createDMap str n =
     do
         a <- parseDMap str -- a = (key, value)
-        b <- if str == [] then Right [] else if take 1 (drop (getLengthUntil str ':' + 1) str) /= "\n" -- b = recursively created DMap to append take 1 (drop (getLengthUntil str ':' + 1) str)
-                                        then createDMap ((dropUntilSameSpacing (dropUntil str '\n') n) True) n -- recursively call next line
-                                        else createDMap (dropUntilSameSpacing (dropUntil (dropUntil str '\n') '\n') n True) n -- recursively call next next line
+        b <- if str == [] then Right [] else 
+            do
+            s <- dropUntilSameSpacing (dropUntil str '\n') n True -- if isValueOnSameLine str
+            createDMap s n -- b = recursively created DMap to append take 1 (drop (getLengthUntil str ':' + 1) str)
         return $ a : b
+
+parseDMap :: String -> Either String (String, Document)
+parseDMap str = do
+    key <- checkDMapKey $ readLine str
+    value       <- parseDMapValue str
+    return (key, value)
+
+parseDMapValue :: String -> Either String Document
+parseDMapValue str 
+    | isValueOnSameLine str = createDocument $ (dropUntil (readLine str) ':')
+    | otherwise = if spacingLength (getNextLine str) >= spacingLength str
+                  then 
+                    if (spacingLength str > (spacingLength (getNextLine str))) && (elem ':' (getNextLine str)) 
+                    then Right DNull
+                    else createDocument $ dropUntil str '\n'
+                  else 
+                    Left $ "DMap value on same height as key. " ++ errorMsg str
 
 createDList :: String -> Int -> Either String [Document]
 createDList [] n = Right []
 createDList str n =
     do
-        a <- createDListElement $ str
-        b <- if str == [] then Right [] else createDList ((dropUntilSameSpacing (dropUntil str '\n') n) False) n
+        a <- createDListElement $ replaceDash str
+        b <- if str == [] then Right [] else
+            do
+                a <- dropUntilSameSpacing (dropUntil str '\n') n False
+                createDList a n
         return $ a : b
 
 createDListElement :: String -> Either String Document
-createDListElement str
-    | elem ':' (readLine str) = do
-        a <- createDMap str (spacingLengthDMap str)
-        return $ DMap a
-    | otherwise = createType $ removeAllSpacing $ readLine str
+createDListElement str = createDocument $ str
 
 isDNull :: Document -> Bool
 isDNull DNull = True
 isDNull _ = False
 
 isValueOnSameLine :: String -> Bool
-isValueOnSameLine str = take 1 (drop (getLengthUntil str ':' + 1) str) /= "\n"
+isValueOnSameLine str = (dropWhile (\x -> x == ' ') (dropUntil (readLine str) ':')) /= []
 
-parseDMap :: String -> Either String (String, Document)
-parseDMap str = do
-    key <- checkDMapKey $ removeAllSpacing str
-    value       <- if take 1 (drop (getLengthUntil str ':' + 1) str) /= "\n"
-                   then createType $ (dropUntil (readLine str) ':') --createDocument $ drop 1 (dropUntil str ':') 
-                   else createDocument (dropUntil str '\n')
-    return $ (key, value)
+containsQuotedValue :: String -> Bool
+containsQuotedValue str = (elem '\'' str) || (elem '\"' str)
 
-parseDMapValue :: String -> Either String Document
-parseDMapValue str
-    | length(filter (`elem` nums) str) == length str = Right $ DInteger $ readInt str
-    | take 1 str == "-" && length(filter (`elem` nums) (drop 1 str)) == length str - 1 = Right $ DInteger $ readInt str
-    | str == "null" = Right DNull
-    | otherwise = Right $ DString str
+getQuotedValue :: String -> String
+getQuotedValue str = (takeWhile (\x -> x /= '\'' && x /= '\"') (drop 1 (dropWhile (\x -> x /= '\'' && x /= '\"')  str)))
 
 parseDash :: String -> Either String((), String)
 parseDash ('-':x) = Right ((), x)
@@ -95,12 +128,28 @@ errorMsg x = "In expression -> " ++ if x == "" then "\'\'" else x
 dropUntil :: String -> Char -> String
 dropUntil s c = drop (getLengthUntil s c + 1) s
 
-dropUntilSameSpacing :: String -> Int -> Bool -> String
-dropUntilSameSpacing [] _ _ = []
-dropUntilSameSpacing str n dmap 
-    | dmap = if spacingLength str == n then str 
-             else if spacingLengthDMap str == n then [] else dropUntilSameSpacing (dropUntil str '\n') n dmap
-    | otherwise = if spacingLength str == n then str else dropUntilSameSpacing (dropUntil str '\n') n dmap
+dropUntilSameSpacing :: String -> Int -> Bool -> Either String String
+dropUntilSameSpacing [] _ _ = Right []
+dropUntilSameSpacing str n dmap
+    | dmap = if (spacingLength (str)) == n && (notElem '-' (readLine str) || (take 1 (dropUntil str '-')) /= " ") then 
+                if elem ':' (readLine str) 
+                then Right str
+                else Left $ "incorrect height formatting. " ++ errorMsg str
+             else 
+                if spacingLength (str) < n then Right []
+                else dropUntilSameSpacing (dropUntil str '\n') n dmap
+
+    | otherwise = if (spacingLength (str)) == n
+                  then if ((elem '-' (readLine str)) && take 1 (dropUntil str '-') == " ") 
+                       then Right str 
+                       else if (elem ':' (readLine str)) && (not $ isValueOnSameLine str)
+                            then Right []
+                            else dropUntilSameSpacing (dropUntil str '\n') n dmap
+                  else 
+                      if (spacingLength (str)) < n then Right [] 
+                      else dropUntilSameSpacing (dropUntil str '\n') n dmap
+
+-- ((elem ':' (readLine str)) && (not $ isValueOnSameLine str)) 
 
 readLine :: String -> String
 readLine str = take (getLengthUntil str '\n') str
@@ -121,25 +170,33 @@ isInteger (s:xs) b
     | elem s ['0'..'9'] = isInteger xs True
     | otherwise = isInteger [] False
 
-removeAllSpacing :: String -> String
-removeAllSpacing [] = []
-removeAllSpacing (s:xs)
-    | s == ' ' || s == '-' = removeAllSpacing xs
-    | otherwise = [s] ++ removeAllSpacing xs
+isEmptyLine :: String -> Bool
+isEmptyLine str = length (dropWhile (\x -> x == ' ') str) == 0
+
+replaceDash :: String -> String
+replaceDash str
+    | elem '-' (readLine str) = createSpacing (getLengthUntil str '-' + 1) ++ (drop (getLengthUntil str '-' + 1) str)
+    | otherwise = str
+
+createSpacing :: Int -> String
+createSpacing 0 = []
+createSpacing n = [' '] ++ createSpacing (n - 1)
+
+removeBackSpacing :: String -> String
+removeBackSpacing str = let x = dropWhile (\x -> x == ' ') (str) in if take 1 x == "-" then drop 1 x else x
+
+removeBackSpacingDMap :: String -> String
+removeBackSpacingDMap = dropWhile (\x -> x == ' ')
+
+removeForwardSpacing:: String -> String
+removeForwardSpacing str = reverse (dropWhile (\x -> not $ elem x (alphaNums ++ ['-'])) (dropWhile (\x -> not $ elem x (alphaNums ++ ['-'])) (reverse (readLine str))))
 
 spacingLength :: String -> Int
 spacingLength [] = 0
 spacingLength (s:xs)
     | s == ' ' = spacingLength xs + 1
-    | s == '\n' || s == ':' = spacingLength []
+    | s == '\n' || s == '-' || elem s alphaNums = spacingLength []
     | otherwise = spacingLength xs
-
-spacingLengthDMap :: String -> Int
-spacingLengthDMap [] = 0
-spacingLengthDMap (s:xs)
-    | s == ' ' || s == '-' = spacingLengthDMap xs + 1
-    | s == '\n' || s == ':' = spacingLengthDMap []
-    | otherwise = spacingLengthDMap xs
 
 getHeights :: String -> [Int]
 getHeights [] = []
@@ -159,25 +216,17 @@ readInt = read
 
 checkDMapKey :: String -> Either String String
 checkDMapKey x =
-    let untilColon = takeWhile (/= ':' ) x
+    let untilColon = if containsQuotedValue (takeWhile (/= ':' ) x) 
+                     then getQuotedValue (takeWhile (/= ':' ) x) 
+                     else removeForwardSpacing $ removeBackSpacingDMap (takeWhile (/= ':' ) x)
     in
         --if length (filter (`elem` letters) untilColon) /= length untilColon then Left $ "DMap key contained illegal characters. " ++ errorMsg x else
         if null untilColon then Left $ "No DMap key is present. " ++ errorMsg x else
-        if length untilColon > 10 then Left $ "DMap key was too long. " ++ errorMsg x
+        if length untilColon > 10 then Left $ "DMap key was too long. " ++ errorMsg x else
+        if take 1 (dropUntil (readLine x) ':') /= " " && take 1 (dropUntil (readLine x) ':') /= [] then Left $ "No space after DMap key. " ++ errorMsg x
         -- if length untilColon == length x then Left $ "No \':\' after DMap key. " ++ errorMsg x else
         --if take 1 (drop (length untilColon) x) /= ":" then Left $ "No \':\' after DMap key. " ++ errorMsg x
-        else Right untilColon
-
-checkDMapValue :: String -> String -> Either String String
-checkDMapValue key x =
-    let value = take 1 (drop 1 x)
-        rest = drop 1 x
-    in
-        if take 1 x /= " " then Left $ "No space after DMap key's colon. " ++ errorMsg key ++ x else
-        if value == " " then Left $ "Only one space after DMaps's key is allowed. " ++ errorMsg key ++ x else
-        if length (filter (`notElem` alphaNums ++ "-") rest) /= 0 then Left $ "DMap's value contains illegal characters. " ++ errorMsg key ++ x
-        else Right rest
-
+        else Right $ untilColon
 -- IMPLEMENT
 -- Change right hand side as you wish
 -- You will have to create an instance of FromDocument
