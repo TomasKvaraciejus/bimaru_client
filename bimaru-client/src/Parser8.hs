@@ -3,7 +3,7 @@
 {-# HLINT ignore "Avoid lambda" #-}
 {-# HLINT ignore "Move brackets to avoid $" #-}
 
-module Parser () where
+module Parser8 () where
 
 data Document =
     DMap [(String, Document)]
@@ -40,7 +40,7 @@ createDocument str
     | removeBackSpacingDMap (readLine str) == "[]" = Right $ DList []
     | removeBackSpacingDMap (readLine str) == "{}" = Right $ DMap []
     | elem '-' (readLine str) && (take 1 (dropUntil str '-') == " ") = do
-        DList <$> ((createDList str (spacingLength str)))
+        DList <$> (createDList str (spacingLength str))
     | elem ':' (readLine str) = do
         a <- createDMap str (spacingLength str)
         return $ DMap a
@@ -70,7 +70,7 @@ parseDMapValue str
     | isValueOnSameLine str = createDocument $ (dropUntil (readLine str) ':')
     | otherwise = if spacingLength (getNextLine str) >= spacingLength str
                     then 
-                        if (spacingLength str > (spacingLength (getNextLine str))) && (elem ':' (getNextLine str)) 
+                        if (spacingLength str == (spacingLength (getNextLine str))) && (elem ':' (getNextLine str)) 
                         then Right DNull
                         else createDocument $ dropUntil str '\n'
                     else 
