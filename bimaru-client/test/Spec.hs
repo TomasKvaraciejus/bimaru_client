@@ -2,7 +2,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Data.String.Conversions
-import Data.Yaml as Y ( encode )
+import Data.Yaml as Y ( encodeWith, defaultEncodeOptions, defaultFormatOptions, setWidth, setFormat)
 
 import Lib1(State(..))
 import Lib2 (renderDocument, gameStart, hint)
@@ -24,7 +24,7 @@ golden :: TestTree
 golden = testGroup "Handles foreign rendering"
   [
     testProperty "parseDocument (Data.Yaml.encode doc) == doc" $
-      \doc -> parseDocument (cs (Y.encode doc)) == Right doc
+      \doc -> parseDocument (friendlyEncode doc) == Right doc
   ]
 
 dogfood :: TestTree
@@ -34,76 +34,86 @@ dogfood = testGroup "Eating your own dogfood"
       \doc -> parseDocument (renderDocument doc) == Right doc
   ]
 
+friendlyEncode :: Document -> String
+friendlyEncode doc = cs (Y.encodeWith (setFormat (setWidth Nothing defaultFormatOptions) defaultEncodeOptions) doc)
+
 fromYamlTests :: TestTree
 fromYamlTests = testGroup "Document from yaml"
-  [   testCase "null" $
-          parseDocument "~" @?= Right DNull
-    , testCase "DList" $
-        parseDocument "John:\n  - Hello:\n    - 1\n    - 2\n    - kello: null\n      priviet: 5\n    - t\n    - q\n  - Hu: null\n    John: 1\n    hi: hello\ngame: o\n" @?=
-          Right (DMap[("John", DList[DMap[("Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5)], DString "t", DString "q"])], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")])
-    , testCase "DMap - 1 element" $
-        parseDocument "John: 5\n" @?= Right (DMap[("John", DInteger 5)])
-    , testCase "DMap - 2 elements" $
-        parseDocument "John: 5\nStacey: Konichiwa\n" @?= Right (DMap[("John", DInteger 5), ("Stacey", DString "Konichiwa")])
-    , testCase "DMap - 3 elements" $
-        parseDocument "John: 5\nStacey: Konichiwa\nJessica: null\n" @?= Right (DMap[("John", DInteger 5), ("Stacey", DString "Konichiwa"), ("Jessica", DNull)])
-    , testCase "DMap - 2 elements, nested" $
-        parseDocument "John:\n  Stacey: 5\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5)])])
-    , testCase "DMap - 3 elements, nested inside" $
-        parseDocument "John:\n  Stacey: 5\n  Jessica: null\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5), ("Jessica", DNull)])])
-    , testCase "DMap - 3 elements, nested outside" $
-        parseDocument "John:\n  Stacey: 5\nJessica: null\n" @?= Right (DMap[("John", DMap[("Stacey", DInteger 5)]), ("Jessica", DNull)])
-    , testCase "Dmap - many nested" $
-        parseDocument "John:\n  Stacey:\n    Jessica:\n      Kelly: 5" @?= Right (DMap[("John", DMap[("Stacey", DMap[("Jessica", DMap[("Kelly", DInteger 5)])])])])
-    , testCase "Dlist - 1 element" $ 
-        parseDocument "- John\n" @?= Right (DList[DString "John"])
-    , testCase "Dlist - 2 elements " $ 
-        parseDocument "- John\n- 2\n" @?= Right (DList[DString "John", DInteger 2])
-    , testCase "Dlist - 3 elements" $ 
-        parseDocument "- John\n- Kelly\n- Jeremy\n" @?= Right (DList[DString "John", DString "Kelly", DString "Jeremy"])
-    , testCase "DList - 2 lists nested" $
-        parseDocument "- John:\n  - Jeremy\n" @?= Right (DList[DMap[("John", DList[DString "Jeremy"])]])
-    , testCase "DList & DMap - 2 elements nested" $
-        parseDocument "John:\n  - Jeremy: 5\n" @?= Right (DMap[("John", DList[DMap[("Jeremy", DInteger 5)]])])
-    , testCase "DMap & DList - 2 elements, nested" $
-        parseDocument "John:\n  - 5\n" @?= Right (DMap[("John", DList[DInteger 5])])
-    , testCase "DMap & DList - 3 elements, nested" $
-        parseDocument "John:\n  - 5\n  - Stacey\n" @?= Right (DMap[("John", DList[DInteger 5, DString "Stacey"])])
-        
-        -- negative integers
-        -- " -x" - error (spacing after dash)
-
-    -- IMPLEMENT more test cases:
-    -- * other primitive types/values
-    -- * nested types
+  [ 
+    testCase "null" $
+          parseDocument "null\n" @?= Right DNull
+    , testCase "Empty DMap" $
+        parseDocument "{}\n" @?= Right (DMap [])
+    , testCase "Empty DList" $
+        parseDocument "[]\n" @?= Right (DList  [])
+    , testCase "DMap in DList" $
+        parseDocument "- AAA: BBB\n" @?= Right (DList  [DMap [("AAA", DString "BBB")]])
+    , testCase "Empty DList in DMap" $
+        parseDocument "AAA:\n  []\n" @?= Right (DMap [("AAA", DList [])])
+    , testCase "Empty DList in DList" $
+        parseDocument "- []\n" @?= Right (DList [DList []])
+    , testCase "Empty DMap in DMap" $
+        parseDocument "AAA: {}\n" @?= Right (DMap [("AAA", DMap [])])
+    , testCase "DMap in DMap" $
+        parseDocument "AAA:\n  BBB: ABC\n" @?= Right (DMap [("AAA", DMap [("BBB", DString "ABC")])])
+    , testCase "DList with 4 elements" $
+        parseDocument "- a\n- b\n- c\n- d\n" @?= Right (DList [DString "a", DString "b", DString "c", DString "d"])
+    , testCase "Negative DInteger" $
+        parseDocument "-3\n" @?= Right (DInteger (-3))
+    , testCase "DInteger in list" $
+        parseDocument "- 3\n" @?= Right (DList [DInteger 3])
+    , testCase "Negative DInteger in list" $
+        parseDocument "- -3\n" @?= Right (DList [DInteger (-3)])
+    , testCase "DString with number" $
+        parseDocument "'3'\n" @?= Right (DString "3")
+    , testCase "DString with spacing" $
+        parseDocument "'aa bb'\n" @?= Right (DString "aa bb")
+    , testCase "Multiple DMaps on same level" $
+        parseDocument "aaa: bbb\nABA: 3\n" @?= Right (DMap [("aaa", DString "bbb"), ("ABA", DInteger 3)])
+    , testCase "Multiple DMaps on same nested level" $
+        parseDocument "abc:\n  aaa: bbb\n  ABA: 3\n" @?= Right (DMap [("abc", DMap [("aaa", DString "bbb"), ("ABA", DInteger 3)])])
+    , testCase "Multiple Lists on same nested level" $
+        parseDocument "- - aaa\n  - bbb\n  - abc\n" @?= Right (DList [DList [DString "aaa", DString "bbb", DString "abc"]])
+    , testCase "DMap value missing spacing" $
+        parseDocument "aaa:\nbbb\n" @?= Left "incorrect height formatting. In expression -> bbb\n"
+    , testCase "Auto-generated test 1" $
+        parseDocument "ZovsapRAp:\n- -4\n- - bHV:\n      eQYVrpf: {}\n    chUnbzBf: 6\n    wnstZFdus:\n      sCRItxD: zP76\n  - []\n  - []\n- 4\n- - {}\n" @?= Right (DMap [("ZovsapRAp",DList [DInteger (-4),DList [DMap [("bHV",DMap [("eQYVrpf",DMap [])]),("chUnbzBf",DInteger 6),("wnstZFdus",DMap [("sCRItxD",DString "zP76")])],DList [],DList []],DInteger 4,DList [DMap []]])])
+    , testCase "Auto-generated test 2" $
+        parseDocument "- zRx:\n    BmscW:\n    - 9\n    - 11\n    - '7  '\n    p: {}\n  Cc:\n  - 4\n  - -8\n  - HVO 38z 7z\n  - m   tdM\n  ImttAwtvon: -12\n- -1\n- 11\n" @?= Right (DList [DMap [("Cc",DList [DInteger 4,DInteger (-8),DString "HVO 38z 7z",DString "m   tdM"]),("ImttAwtvon",DInteger (-12)),("zRx",DMap [("BmscW",DList [DInteger 9,DInteger 11,DString "7  "]),("p",DMap [])])],DInteger (-1),DInteger 11])
+    , testCase "Auto-generated test 3" $
+        parseDocument "EkhDQYjrZI: ' 3x QPQ ZW'\ne: 3\nIwpBLDqSj:\n- 6x u51 MB\n- - -4\n  - z: Cd t\n    bciXGwxY: RcaT\n    dFz:\n      Hd:\n      - 7c Sw\n      - {}\n      - - 12\n      TsmhmC: ' s'\n      NSMZbK:\n      - '09 WV5l  H '\n      - {}\n  - []\nUuunKin: Ni    8mIPS\n" @?= Right (DMap [("EkhDQYjrZI",DString " 3x QPQ ZW"),("IwpBLDqSj",DList [DString "6x u51 MB",DList [DInteger (-4),DMap [("bciXGwxY",DString "RcaT"),("dFz",DMap [("Hd",DList [DString "7c Sw",DMap [],DList [DInteger 12]]),("NSMZbK",DList [DString "09 WV5l  H ",DMap []]),("TsmhmC",DString " s")]),("z",DString "Cd t")],DList []]]),("UuunKin",DString "Ni    8mIPS"),("e",DInteger 3)])
+    , testCase "DMap missing space" $
+        parseDocument "aaa:a\n" @?= Left "No space after DMap key. In expression -> aaa:a"
+    , testCase "DMap inconsistent spacing" $
+        parseDocument "aaa:\n a\nbbb:\n    b\nABA:\n  aaa\n" @?= Right (DMap [("aaa", DString "a"), ("bbb", DString "b"), ("ABA", DString "aaa")])
   ]
 
 toYamlTests :: TestTree
 toYamlTests = testGroup "Document to yaml"
   [   testCase "null" $
-        renderDocument DNull @?= "~"
+        renderDocument DNull @?= "null\n"
     , testCase "int" $
-        renderDocument (DInteger 5) @?= "5"
+        renderDocument (DInteger 5) @?= "5\n"
     , testCase "list of ints" $
         renderDocument (DList [DInteger 5, DInteger 6]) @?= listOfInts
     , testCase "Big boi" $
         renderDocument (DMap[("game_setup_id", DString "0de28b51-e8ef-41d5-a1e6-131b51c4a638"), ("number_of_hints", DInteger 10), ("occupied_rows", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 3), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 5), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 4), ("tail", DMap[("head", DInteger 2), ("tail", DNull)])])])])])])])])])]), ("occupied_cols", DMap[("head", DInteger 1), ("tail", DMap[("head", DInteger 1), ("tail", DMap[("head", DInteger 4), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 2), ("tail", DMap[("head", DInteger 0), ("tail", DMap[("head", DInteger 4), ("tail", DNull)])])])])])])])])])])]) @?=
-          "game_setup_id: 0de28b51-e8ef-41d5-a1e6-131b51c4a638\nnumber_of_hints: 10\noccupied_rows:\n  head: 3\n  tail:\n    head: 3\n    tail:\n      head: 0\n      tail:\n        head: 0\n        tail:\n          head: 3\n          tail:\n            head: 0\n            tail:\n              head: 5\n              tail:\n                head: 0\n                tail:\n                  head: 4\n                  tail:\n                    head: 2\n                    tail: ~\noccupied_cols:\n  head: 1\n  tail:\n    head: 1\n    tail:\n      head: 4\n      tail:\n        head: 2\n        tail:\n          head: 2\n          tail:\n            head: 2\n            tail:\n              head: 2\n              tail:\n                head: 2\n                tail:\n                  head: 0\n                  tail:\n                    head: 4\n                    tail: ~\n"
+          "game_setup_id: 0de28b51-e8ef-41d5-a1e6-131b51c4a638\nnumber_of_hints: 10\noccupied_rows:\n  head: 3\n  tail:\n    head: 3\n    tail:\n      head: 0\n      tail:\n        head: 0\n        tail:\n          head: 3\n          tail:\n            head: 0\n            tail:\n              head: 5\n              tail:\n                head: 0\n                tail:\n                  head: 4\n                  tail:\n                    head: 2\n                    tail: null\noccupied_cols:\n  head: 1\n  tail:\n    head: 1\n    tail:\n      head: 4\n      tail:\n        head: 2\n        tail:\n          head: 2\n          tail:\n            head: 2\n            tail:\n              head: 2\n              tail:\n                head: 2\n                tail:\n                  head: 0\n                  tail:\n                    head: 4\n                    tail: null\n"
     , testCase "Dlist" $
         renderDocument (DMap[("John", DList[DString "Hello", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5)], DString "t", DString "q"], DMap[("Hu", DNull), ("John", DInteger 1), ("hi", DString "hello")]]), ("game", DString "o")]) @?=
-          "John:\n  - Hello:\n    - 1\n    - 2\n    - kello: ~\n      priviet: 5\n    - t\n    - q\n  - Hu: ~\n    John: 1\n    hi: hello\ngame: o\n"
+          "John:\n- Hello\n- - 1\n  - 2\n  - kello: null\n    priviet: 5\n  - t\n  - q\n- Hu: null\n  John: 1\n  hi: hello\ngame: o\n"
     , testCase "DList in DList" $
         renderDocument (DMap[("John", DMap[("Hello", DList[ DString "Nice", DList[DInteger 1, DInteger 2, DMap[("kello", DNull), ("priviet", DInteger 5), ("not", DString "t"), ("map", DMap[("Hu", DMap[("John", DInteger 1), ("yes", DNull)])])], DInteger 5]]), ("game", DString "o")])]) @?=
-          "John:\n  Hello:\n    - Nice:\n      - 1\n      - 2\n      - kello: ~\n        priviet: 5\n        not: t\n        map:\n          Hu:\n            John: 1\n            yes: ~\n      - 5\n  game: o\n"
+          "John:\n  Hello:\n  - Nice\n  - - 1\n    - 2\n    - kello: null\n      priviet: 5\n      not: t\n      map:\n        Hu:\n          John: 1\n          'yes': null\n    - 5\n  game: o\n"
     , testCase "DList in DMap" $
         renderDocument (DList[DInteger 4, DInteger 9, DMap[("u", DMap[("red", DList[DMap[("Hello", DInteger 9)], DMap[("green", DInteger 6), ("brown", DList[DMap[("not", DInteger 5)], DMap[("notnice", DInteger 6)]]), ("nice", DString "nice")]])])], DNull]) @?=
-          "- 4\n- 9\n- u:\n    red:\n      - Hello: 9\n      - green: 6\n        brown:\n          - not: 5\n          - notnice: 6\n        nice: nice\n- ~\n"
+          "- 4\n- 9\n- u:\n    red:\n    - Hello: 9\n    - green: 6\n      brown:\n      - not: 5\n      - notnice: 6\n      nice: nice\n- null\n"
     , testCase "DInteger" $
-        renderDocument (DInteger 5) @?= "5"   
+        renderDocument (DInteger 5) @?= "5\n"   
     , testCase "DNull" $
-        renderDocument DNull @?= "~"
+        renderDocument DNull @?= "null\n"
     , testCase "DString" $
-        renderDocument (DString "hello") @?= "hello"
+        renderDocument (DString "hello") @?= "hello\n"
     , testCase "DMap" $
         renderDocument (DMap[("Hello", DInteger 3)]) @?= "Hello: 3\n"
     , testCase "DMap 2" $
@@ -111,17 +121,17 @@ toYamlTests = testGroup "Document to yaml"
     , testCase "DMap nested DMap" $
         renderDocument (DMap[("Hello", DMap[("Bye", DString "red bird")])]) @?= "Hello:\n  Bye: red bird\n"
     , testCase "DMap nested DList" $
-        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "Hello:\n  - 4\n  - good\n  - Wow: ~\n"
+        renderDocument (DMap[("Hello", DList[DInteger 4, DString "good", DMap[("Wow", DNull)]])]) @?= "Hello:\n- 4\n- good\n- Wow: null\n"
     , testCase "DList" $
-        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "- 1\n- ~\n- hello\n"
+        renderDocument (DList[DInteger 1, DNull, DString "hello"]) @?= "- 1\n- null\n- hello\n"
     , testCase "DList nested DList" $
-        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "- ~\n- red:\n  - 4\n  - 0\n  - Hello: goodbye\n"
+        renderDocument (DList[DNull, DString "red", DList[DInteger 4, DInteger 0, DMap[("Hello", DString "goodbye")]]]) @?= "- null\n- red\n- - 4\n  - 0\n  - Hello: goodbye\n"
     , testCase "DList nested DList 2" $
-        renderDocument (DList[DList[DList[DList[DString "a"]]]]) @?= "        - a\n"
+        renderDocument (DList[DList[DList[DList[DString "a"]]]]) @?= "- - - - a\n"
     , testCase "DList nested DList 3" $
-        renderDocument (DList[DString "aa", DList[DList[DString "aaa", DList[DString "a"]]]]) @?= "- aa:\n    - aaa:\n      - a\n"
+        renderDocument (DList[DString "aa", DList[DList[DString "aaa", DList[DString "a"]]]]) @?= "- aa\n- - - aaa\n    - - a\n"
     , testCase "Coord List" $
-        renderDocument (DMap[("coords", DList [DMap[("col: ", DInteger 1), ("row: ", DInteger 1)]])]) @?= "coords:\n- col: 1\n  row: 1\n"
+        renderDocument (DMap[("coords", DList [DMap[("col: ", DInteger 1), ("row: ", DInteger 1)]])]) @?= "coords:\n- 'col: ': 1\n  'row: ': 1\n"
   ]
 
 wrongState :: String
