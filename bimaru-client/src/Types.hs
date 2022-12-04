@@ -5,6 +5,7 @@ module Types (
     FromDocument, fromDocument
 ) where
 
+import qualified Data.Map as Map
 import qualified Data.Aeson as A
 import Data.Yaml as Y
 import Data.HashMap.Strict as HMS
@@ -23,6 +24,7 @@ import Test.QuickCheck.Gen as Gen
 newtype Check = Check {
     coords :: [Coord]
 } deriving (Generic, Show, Eq)
+
 instance ToJSON Check
 
 -- Data structure used to post ship allocations
@@ -51,6 +53,7 @@ instance Eq Document where
     DMap kv1 == DMap kv2 = L.sort kv1 == L.sort kv2
     _ == _ = False
 
+
 instance FromJSON Document where
     parseJSON Y.Null = pure DNull
     parseJSON (Y.String t) = pure $ DString (T.unpack t)
@@ -62,12 +65,14 @@ instance FromJSON Document where
             Just i -> pure $ DInteger i
     parseJSON a = error $ show a ++ " not supported"
 
+
 instance ToJSON Document where
     toJSON DNull = A.Null
     toJSON (DString s) = A.String (cs s)
     toJSON (DInteger i) = A.Number (S.scientific (toInteger i) 0)
     toJSON (DList l) = A.Array $ V.fromList $ L.map toJSON l
     toJSON (DMap kvs) = A.Object $ HMS.fromList $ L.map (\(k,v) -> (cs k, toJSON v)) kvs
+
 
 instance Arbitrary Document where
   arbitrary = arbitraryDocument
@@ -103,15 +108,18 @@ arbitraryDMap :: Gen Document
 arbitraryDMap = do
     s <- getSize
     n <- choose (0, min 4 s)
-    DMap <$> vectorOf n ((,) <$> arbitraryK <*> arbitraryDocument)
+    DMap . Map.toList . Map.fromList <$> vectorOf n ((,) <$> arbitraryK <*> arbitraryDocument)
     where
         arbitraryK = do
             s <- getSize
             n <- choose (1, min 10 s)
             vectorOf n (oneof [arbitraryUpper, arbitraryLower])
 
+
 class ToDocument a where
     toDocument :: a -> Document
 
+
 class FromDocument a where
     fromDocument :: Document -> Either String a
+

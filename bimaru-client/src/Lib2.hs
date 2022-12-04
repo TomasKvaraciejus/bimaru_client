@@ -5,6 +5,7 @@
 module Lib2 (renderDocument, hint, gameStart) where
 import Lib1 (State(..))
 import Types
+import Text.Read
 
 
 wrongInput :: String
@@ -53,39 +54,59 @@ instance ToDocument Check where
 -- IMPLEMENT
 -- Renders document to yaml
 renderDocument :: Document -> String
-renderDocument (DMap [("coords", DList l)])    = "coords:\n" ++ parseCoordList l
+renderDocument (DMap []) = "{}\n"
+renderDocument (DList []) = "[]\n"
 renderDocument (DMap a) = parseDMap 0 1 a
-renderDocument (DList a) =  parseDList 0 1 a 
-renderDocument (DString a)  = a
-renderDocument DNull = "~"
-renderDocument (DInteger a) = show a 
-
-
-parseCoordList :: [Document] -> String
-parseCoordList [] = ""
-parseCoordList ((DMap [x, y]):xs) = "- " ++ fst x ++ show (toNum' $ snd x) ++ "\n  " ++ fst y ++ show (toNum' $ snd y) ++ "\n" ++ parseCoordList xs
-parseCoordList _ = ""
+renderDocument (DList a) =  parseDList 0 1 a
+renderDocument (DString a)  = parseDString a  ++ "\n"
+renderDocument DNull = "null\n"
+renderDocument (DInteger a) = show a ++ "\n"
 
 parseDList :: Int -> Int -> [Document] -> String
 parseDList _ _ [] = ""
-parseDList i minus ((DList x):xs) = replicate (i * 2) ' ' ++ parseDList (i + 1) i x ++ parseDList i 0 xs
-parseDList i minus ((DMap x):xs) = replicate (i * 2) ' ' ++ "- " ++ parseDMap (i + 1) 0 x ++ parseDList i 0 xs
-parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs 
-parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
-parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "~"  ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DList []):xs) = replicate ((i - minus) * 2) ' ' ++ "- []\n" ++ parseDList i 0 xs
+parseDList i minus ((DList x):xs) = replicate ((i-minus) * 2) ' ' ++ "- " ++ parseDList (i + 1) (i + 1) x ++ parseDList i 0 xs -- buvo replicate (i * 2) ' ' ++ "-" ++ parseDList (i + 1) i x ++ parseDList i 0 xs
+parseDList i minus ((DMap []):xs) = replicate ((i-minus) * 2) ' ' ++ "- " ++ "{}\n" ++ parseDList i 0 xs --buvo"- "
+parseDList i minus ((DMap x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ parseDMap (i + 1) 0 x ++ parseDList i 0 xs
+parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ parseDString x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs --check DList nesamone cia
+parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "null"  ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
 
 checkIfDList :: [Document] -> String
-checkIfDList ((DList x):_) = ":"
+checkIfDList ((DList x):_) = "" --buvo":"
 checkIfDList _ = ""
 
 parseDMap :: Int -> Int ->[(String, Document)] -> String
 parseDMap _ _ [] = ""
-parseDMap i mult ((x, DMap y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ":\n" ++ parseDMap (i + 1) 1 y ++ parseDMap i 1 xs
-parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ x ++ ":\n" ++ parseDList (i + 1) 0 y  ++ parseDMap i 1 xs
-parseDMap i mult ((x, DInteger y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": " ++ show y ++ "\n" ++ parseDMap i 1 xs
-parseDMap i mult ((x, DString y):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": " ++ y ++ "\n" ++ parseDMap i 1 xs
-parseDMap i mult ((x, DNull):xs) = replicate (i * 2 * mult) ' ' ++ x ++ ": ~" ++ "\n" ++ parseDMap i 1 xs
+parseDMap i mult ((x, DMap []):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ "{}\n" ++ parseDMap i 1 xs
+parseDMap i mult ((x, DMap y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ":\n" ++ parseDMap (i + 1) 1 y ++ parseDMap i 1 xs
+parseDMap i mult ((x, DList []):xs) =  replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ "[]\n"  ++ parseDMap i 1 xs
+parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ parseDString x ++ ":\n" ++ parseDList (i ) 0 y  ++ parseDMap i 1 xs --(parseDList (i+1) buvo)
+parseDMap i mult ((x, DInteger y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ show y ++ "\n" ++ parseDMap i 1 xs
+parseDMap i mult ((x, DString y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ parseDString y ++ "\n" ++ parseDMap i 1 xs
+parseDMap i mult ((x, DNull):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": null" ++ "\n" ++ parseDMap i 1 xs
 
+parseDString :: String -> String
+parseDString str
+    | str == "" = "''"
+    | str == "n" = "'" ++ str ++ "'"
+    | str == "Yes" = "'" ++ str ++ "'"
+    | str == "yes" = "'" ++ str ++ "'"
+    | str == "No" = "'" ++ str ++ "'"
+    | str == "no" = "'" ++ str ++ "'"
+    | isStringNumber str = "'" ++ str ++ "'"
+    | last str == ' ' = "'" ++ str ++ "'"
+    | take 1 str == " " = "'" ++ str ++ "'"
+    | otherwise = str
+
+isStringNumber :: String -> Bool
+isStringNumber str = 
+    let 
+        number = readMaybe str :: Maybe Int
+    in
+        case number of
+            Just _ -> True
+            Nothing -> False
 -------------------------------------------------------------------
 
 -- IMPLEMENT
