@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-module Lib2 (renderDocument, hint, gameStart) where
+module Lib2 (renderDocument, hint, gameStart, isDocumentCorrect, wrongState, keysFound, notFoundKey, checkNumHints, toMap, makeList, findSubstring, checkHintLength, fillUpHints) where
 import Lib1 (State(..))
 import Types
 import Text.Read
@@ -48,7 +48,7 @@ instance ToDocument Check where
         where
             makeDList :: Check -> [Document]
             makeDList (Check []) = []
-            makeDList (Check ((Coord x y):xs)) = DMap [("col: ", DInteger x), ("row: ", DInteger y)] : makeDList (Check xs)
+            makeDList (Check ((Coord x y):xs)) = DMap [("col", DInteger x), ("row", DInteger y)] : makeDList (Check xs)
 
 
 -- IMPLEMENT
@@ -68,20 +68,17 @@ parseDList i minus ((DList []):xs) = replicate ((i - minus) * 2) ' ' ++ "- []\n"
 parseDList i minus ((DList x):xs) = replicate ((i-minus) * 2) ' ' ++ "- " ++ parseDList (i + 1) (i + 1) x ++ parseDList i 0 xs -- buvo replicate (i * 2) ' ' ++ "-" ++ parseDList (i + 1) i x ++ parseDList i 0 xs
 parseDList i minus ((DMap []):xs) = replicate ((i-minus) * 2) ' ' ++ "- " ++ "{}\n" ++ parseDList i 0 xs --buvo"- "
 parseDList i minus ((DMap x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ parseDMap (i + 1) 0 x ++ parseDList i 0 xs
-parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
-parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ parseDString x ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs --check DList nesamone cia
-parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "null"  ++ checkIfDList xs ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DInteger x):xs) = replicate ((i - minus) * 2) ' ' ++ "- " ++ show x ++ "\n" ++ parseDList i 0 xs
+parseDList i minus ((DString x):xs)  = replicate ((i - minus) * 2) ' ' ++ "- " ++ parseDString x ++ "\n" ++ parseDList i 0 xs --check DList nesamone cia -- pats tu nesąmonė
+parseDList i minus ((DNull:xs)) = replicate ((i - minus) * 2) ' ' ++ "- " ++ "null" ++ "\n" ++ parseDList i 0 xs
 
-checkIfDList :: [Document] -> String
-checkIfDList ((DList x):_) = "" --buvo":"
-checkIfDList _ = ""
 
 parseDMap :: Int -> Int ->[(String, Document)] -> String
 parseDMap _ _ [] = ""
 parseDMap i mult ((x, DMap []):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ "{}\n" ++ parseDMap i 1 xs
 parseDMap i mult ((x, DMap y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ":\n" ++ parseDMap (i + 1) 1 y ++ parseDMap i 1 xs
 parseDMap i mult ((x, DList []):xs) =  replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ "[]\n"  ++ parseDMap i 1 xs
-parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ parseDString x ++ ":\n" ++ parseDList (i ) 0 y  ++ parseDMap i 1 xs --(parseDList (i+1) buvo)
+parseDMap i mult ((x, DList y):xs) =  replicate (i * 2 * mult) ' ' ++ parseDString x ++ ":\n" ++ parseDList i 0 y  ++ parseDMap i 1 xs --(parseDList (i+1) buvo)
 parseDMap i mult ((x, DInteger y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ show y ++ "\n" ++ parseDMap i 1 xs
 parseDMap i mult ((x, DString y):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": " ++ parseDString y ++ "\n" ++ parseDMap i 1 xs
 parseDMap i mult ((x, DNull):xs) = replicate (i * 2 * mult) ' ' ++ parseDString x ++ ": null" ++ "\n" ++ parseDMap i 1 xs
@@ -89,13 +86,11 @@ parseDMap i mult ((x, DNull):xs) = replicate (i * 2 * mult) ' ' ++ parseDString 
 parseDString :: String -> String
 parseDString str
     | str == "" = "''"
-    | str == "n" = "'" ++ str ++ "'"
-    | str == "Yes" = "'" ++ str ++ "'"
-    | str == "yes" = "'" ++ str ++ "'"
-    | str == "No" = "'" ++ str ++ "'"
-    | str == "no" = "'" ++ str ++ "'"
+    | str == "Yes" || str == "yes" ||
+      str == "No"  || str == "no"  ||
+      str == "n" = "'" ++ str ++ "'"
     | isStringNumber str = "'" ++ str ++ "'"
-    | last str == ' ' = "'" ++ str ++ "'"
+    | take 1 (reverse str) == " " = "'" ++ str ++ "'"
     | take 1 str == " " = "'" ++ str ++ "'"
     | otherwise = str
 

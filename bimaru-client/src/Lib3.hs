@@ -4,14 +4,7 @@ module Lib3(hint, gameStart, parseDocument, GameStart, Hint) where
 
 import Types
 import Lib1 (State(..))
-
-instance FromDocument GameStart where
-    fromDocument (DString x) = Right (GameStart 0 [0] [0])
-    fromDocument _ = Left "not a DString"
-
-instance FromDocument Hint where
-    fromDocument (DString x) = Right Hint
-    fromDocument _ = Left "not a DString"
+import Lib2 (isDocumentCorrect, wrongState, keysFound, notFoundKey, checkNumHints, findSubstring, toMap, makeList, findSubstring, checkHintLength, fillUpHints)
 
 parseDocument :: String -> Either String Document
 parseDocument str = if take 1 (reverse str) == "\n" 
@@ -59,7 +52,7 @@ createDocument str
                     else Left "AAA"
 
 createDMap :: String -> Int -> Either String [(String, Document)] -- recursively creates DMap
-createDMap [] n = Right []
+createDMap [] _ = Right []
 createDMap str n =
     do
         a <- parseDMap str -- a = (key, value)
@@ -87,14 +80,14 @@ parseDMapValue str
                     Left $ "DMap value on same height as key. " ++ errorMsg str
 
 createDList :: String -> Int -> Either String [Document]
-createDList [] n = Right []
+createDList [] _ = Right []
 createDList str n =
     do
         a <- createDListElement $ replaceDash str
         b <- if str == [] then Right [] else
             do
-                a <- dropUntilSameSpacing (dropUntil str '\n') n False
-                createDList a n
+                c <- dropUntilSameSpacing (dropUntil str '\n') n False
+                createDList c n
         return $ a : b
 
 createDListElement :: String -> Either String Document
@@ -105,7 +98,7 @@ isDNull DNull = True
 isDNull _ = False
 
 isValueOnSameLine :: String -> Bool
-isValueOnSameLine str = (dropWhile (\x -> x == ' ') (dropUntil (readLine str) ':')) /= []
+isValueOnSameLine str = (dropWhile (== ' ') (dropUntil (readLine str) ':')) /= []
 
 containsQuotedValue :: String -> Bool
 containsQuotedValue str = (elem '\'' str) || (elem '\"' str)
@@ -113,14 +106,6 @@ containsQuotedValue str = (elem '\'' str) || (elem '\"' str)
 getQuotedValue :: String -> String
 getQuotedValue str = (takeWhile (\x -> x /= '\'' && x /= '\"') (drop 1 (dropWhile (\x -> x /= '\'' && x /= '\"')  str)))
 
-parseDash :: String -> Either String((), String)
-parseDash ('-':x) = Right ((), x)
-parseDash _ = Left "Dash expected"
-
-parseChar :: Char -> String -> Either String (Char, String)
-parseChar ch [] = Left $ "Empty input: '" ++ [ch] ++ "' expected"
-parseChar ch (x:xs) | ch == x = Right (x, xs)
-                    | otherwise = Left $ ch :" expected"
 
 errorMsg :: String -> String
 errorMsg x = "In expression -> " ++ if x == "" then "\'\'" else x
@@ -149,7 +134,6 @@ dropUntilSameSpacing str n dmap
                       if (spacingLength (str)) < n then Right [] 
                       else dropUntilSameSpacing (dropUntil str '\n') n dmap
 
--- ((elem ':' (readLine str)) && (not $ isValueOnSameLine str)) 
 
 readLine :: String -> String
 readLine str = take (getLengthUntil str '\n') str
@@ -166,7 +150,7 @@ getLengthUntil (s:xs) c
 
 isInteger :: String -> Bool -> Bool
 isInteger [] b = b
-isInteger (s:xs) b
+isInteger (s:xs) _
     | elem s ['0'..'9'] = isInteger xs True
     | otherwise = isInteger [] False
 
@@ -183,10 +167,10 @@ createSpacing 0 = []
 createSpacing n = [' '] ++ createSpacing (n - 1)
 
 removeBackSpacing :: String -> String
-removeBackSpacing str = let x = dropWhile (\x -> x == ' ') (str) in if take 1 x == "-" then drop 1 x else x
+removeBackSpacing str = let x = dropWhile (== ' ') str in if take 1 x == "-" then drop 1 x else x
 
 removeBackSpacingDMap :: String -> String
-removeBackSpacingDMap = dropWhile (\x -> x == ' ')
+removeBackSpacingDMap = dropWhile (== ' ')
 
 removeForwardSpacing:: String -> String
 removeForwardSpacing str = reverse (dropWhile (\x -> not $ elem x (alphaNums ++ ['-'])) (dropWhile (\x -> not $ elem x (alphaNums ++ ['-'])) (reverse (readLine str))))
@@ -220,35 +204,79 @@ checkDMapKey x =
                      then getQuotedValue (takeWhile (/= ':' ) x) 
                      else removeForwardSpacing $ removeBackSpacingDMap (takeWhile (/= ':' ) x)
     in
-        --if length (filter (`elem` letters) untilColon) /= length untilColon then Left $ "DMap key contained illegal characters. " ++ errorMsg x else
         if null untilColon then Left $ "No DMap key is present. " ++ errorMsg x else
-        if length untilColon > 10 then Left $ "DMap key was too long. " ++ errorMsg x else
         if take 1 (dropUntil (readLine x) ':') /= " " && take 1 (dropUntil (readLine x) ':') /= [] then Left $ "No space after DMap key. " ++ errorMsg x
-        -- if length untilColon == length x then Left $ "No \':\' after DMap key. " ++ errorMsg x else
-        --if take 1 (drop (length untilColon) x) /= ":" then Left $ "No \':\' after DMap key. " ++ errorMsg x
         else Right $ untilColon
+
 -- IMPLEMENT
 -- Change right hand side as you wish
 -- You will have to create an instance of FromDocument
-data GameStart = GameStart {
-    a :: Int,
-    b :: [Int],
-    c :: [Int]
-}deriving Show
+instance FromDocument GameStart where 
+  fromDocument e =
+    if isDocumentCorrect e
+    then moveWhenStateCorrect e
+    else Left wrongState
+
+data GameStart = GameStart{
+  hints :: Int,
+  rows :: [Int],
+  cols :: [Int]
+} deriving Show
+
+moveWhenStateCorrect :: Document -> Either String GameStart
+moveWhenStateCorrect a = do
+    let keys = keysFound ["number_of_hints", "occupied_rows", "occupied_cols"] a
+    case keys of
+        Left str -> Left (str ++ notFoundKey)
+        Right _ -> continueGameStart a
+        
+continueGameStart ::Document -> Either String GameStart
+continueGameStart e = do
+        x <- checkNumHints(findSubstring "number_of_hints" (toMap e))
+        y <- makeList(findSubstring "occupied_rows" (toMap e))
+        z <- makeList(findSubstring "occupied_cols" (toMap e))
+        return (GameStart x y z )
 
 -- This adds game data to initial state
 -- Errors are not reported since GameStart is already totally valid adt
 -- containing all fields needed
 gameStart :: State -> GameStart -> State
-gameStart (State a b c e) d = State a b c e
+gameStart (State _ _ _ d) (GameStart e f g) = State e f g d
+
 
 -- IMPLEMENT
 -- Change right hand side as you wish
 -- You will have to create an instance of FromDocument
-data Hint = Hint deriving Show
+instance FromDocument Hint where 
+  fromDocument t =
+    if isDocumentCorrect t
+    then checkFurther t
+    else Left "Wrong State Hint data"
+
+data Hint = Hint{
+  toggled :: [Coord]
+} deriving Show
+
+
+checkFurther :: Document -> Either String Hint
+checkFurther t = do
+    let x = if isDocumentCorrect t then checkHintLength $ toMap t else Left "improper document type"
+    case x of
+        Right _ -> makeHint t
+        Left y -> Left y
+
+
+makeHint :: Document -> Either String Hint
+makeHint t = do
+    let x = fillUpHints (toMap t)
+    case x of
+        Right q -> return (Hint q)
+        Left y -> Left y
+
 
 -- Adds hint data to the game state
 -- Errors are not reported since GameStart is already totally valid adt
 -- containing all fields needed
 hint :: State -> Hint -> State
-hint (State a b c e) h = State a b c e
+hint (State a b c d) (Hint e) = State a b c (e ++ d)
+
